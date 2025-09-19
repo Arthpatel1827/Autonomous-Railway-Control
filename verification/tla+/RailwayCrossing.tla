@@ -1,87 +1,106 @@
 ----------------------------- MODULE RailwayCrossing -----------------------------
-
-EXTENDS Naturals, TLC
+EXTENDS TLC
 
 (***************************************************************************)
 (* VARIABLES                                                               *)
 (***************************************************************************)
-
 VARIABLES train, car, barrier
-
-(***************************************************************************)
-(* CONSTANTS                                                               *)
-(***************************************************************************)
-
-CONSTANTS 
-    Idle, Approaching, Crossing, Passed
+vars == << train, car, barrier >>
 
 (***************************************************************************)
 (* INITIAL STATE                                                           *)
 (***************************************************************************)
-
 Init ==
-    /\ train = Idle
-    /\ car = Idle
-    /\ barrier = "UP"
+  /\ train = "Idle"
+  /\ car   = "Idle"
+  /\ barrier = "UP"
 
 (***************************************************************************)
-(* TRANSITIONS                                                             *)
+(* TRAIN TRANSITIONS                                                       *)
 (***************************************************************************)
+(* Train is detected far enough away that we pre-close the barrier *)
+TrainIdleToApproaching ==
+  /\ train = "Idle"
+  /\ train' = "Approaching"
+  /\ barrier' = "DOWN"      \* pre-close
+  /\ UNCHANGED car
 
+(* Train may enter the crossing only when the car is not on it *)
+TrainApproachingToCrossing ==
+  /\ train = "Approaching"
+  /\ car # "Crossing"
+  /\ train' = "Crossing"
+  /\ barrier' = "DOWN"
+  /\ UNCHANGED car
+
+TrainCrossingToPassed ==
+  /\ train = "Crossing"
+  /\ train' = "Passed"
+  /\ barrier' = "DOWN"
+  /\ UNCHANGED car
+
+TrainPassedToIdle ==
+  /\ train = "Passed"
+  /\ train' = "Idle"
+  /\ barrier' = "UP"
+  /\ UNCHANGED car
+
+(***************************************************************************)
+(* CAR TRANSITIONS                                                         *)
+(***************************************************************************)
+(* A car may START crossing only when no train is approaching/crossing *)
+CarIdleToCrossing ==
+  /\ car = "Idle"
+  /\ train = "Idle"         \* stricter than just barrier="UP"
+  /\ barrier = "UP"
+  /\ car' = "Crossing"
+  /\ UNCHANGED << train, barrier >>
+
+CarCrossingToPassed ==
+  /\ car = "Crossing"
+  /\ car' = "Passed"
+  /\ UNCHANGED << train, barrier >>
+
+CarPassedToIdle ==
+  /\ car = "Passed"
+  /\ car' = "Idle"
+  /\ UNCHANGED << train, barrier >>
+
+(***************************************************************************)
+(* SYSTEM NEXT, SPEC, FAIRNESS                                             *)
+(***************************************************************************)
 Next ==
-    \/ /\ train = Idle
-       /\ train' = Approaching
-       /\ car' = car
-       /\ barrier' = barrier
+  \/ TrainIdleToApproaching
+  \/ TrainApproachingToCrossing
+  \/ TrainCrossingToPassed
+  \/ TrainPassedToIdle
+  \/ CarIdleToCrossing
+  \/ CarCrossingToPassed
+  \/ CarPassedToIdle
 
-    \/ /\ train = Approaching
-       /\ train' = Crossing
-       /\ car' = car
-       /\ barrier' = "DOWN"
-
-    \/ /\ train = Crossing
-       /\ train' = Passed
-       /\ car' = car
-       /\ barrier' = "DOWN"
-
-    \/ /\ train = Passed
-       /\ train' = Idle
-       /\ car' = car
-       /\ barrier' = "UP"
-
-    \/ /\ car = Idle
-       /\ car' = Crossing
-       /\ train' = train
-       /\ IF barrier = "DOWN" THEN barrier' = barrier ELSE barrier' = barrier
-
-    \/ /\ car = Crossing
-       /\ car' = Passed
-       /\ train' = train
-       /\ barrier' = barrier
-
-    \/ /\ car = Passed
-       /\ car' = Idle
-       /\ train' = train
-       /\ barrier' = barrier
+(* Fairness: if these actions remain enabled, they must eventually occur *)
+Spec ==
+  Init /\ [][Next]_vars
+      /\ WF_vars(CarCrossingToPassed)
+      /\ WF_vars(TrainCrossingToPassed)
+      /\ WF_vars(TrainApproachingToCrossing)   \* optional but prevents waiting forever in Approaching
 
 (***************************************************************************)
-(* SPECIFICATION                                                           *)
+(* SAFETY & LIVENESS PROPERTIES                                            *)
 (***************************************************************************)
-
-Spec == Init /\ [][Next]_<<train, car, barrier>>
-
-(***************************************************************************)
-(* SAFETY PROPERTIES                                                       *)
-(***************************************************************************)
-
+(* Never both on the crossing *)
 SafetyInvariant ==
-    ~(train = Crossing /\ car = Crossing)
+  ~(train = "Crossing" /\ car = "Crossing")
 
-(***************************************************************************)
-(* LIVENESS PROPERTIES                                                     *)
-(***************************************************************************)
+(* When the train is crossing, the barrier must be down *)
+BarrierWhenTrainCrossing ==
+  (train = "Crossing") => (barrier = "DOWN")
 
-Liveness ==
-    WF_<<train, car, barrier>>(Next)
+(* Progress: once someone starts/approaches crossing, they eventually pass *)
+TrainProgress ==
+  []( (train = "Approaching" \/ train = "Crossing") => <> (train = "Passed") )
+
+CarProgress ==
+  []( (car = "Crossing") => <> (car = "Passed") )
 
 =============================================================================
