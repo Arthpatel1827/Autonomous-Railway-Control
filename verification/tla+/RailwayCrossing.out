@@ -1,28 +1,27 @@
 @!@!@STARTMSG 2262:0 @!@!@
-TLC2 Version 2.20 of Day Month 20?? (rev: 4c54d98)
+TLC2 Version 2.20 of Day Month 20?? (rev: 789535d)
 @!@!@ENDMSG 2262 @!@!@
 @!@!@STARTMSG 2187:0 @!@!@
-Running breadth-first search Model-Checking with fp 1 and seed 3550808751874670847 with 1 worker on 12 cores with 1673MB heap and 64MB offheap memory [pid: 23956] (Windows 11 10.0 amd64, Microsoft 11.0.16.1 x86_64, MSBDiskFPSet, DiskStateQueue).
+Running breadth-first search Model-Checking with fp 65 and seed -8522736034618639416 with 1 worker on 11 cores with 4096MB heap and 64MB offheap memory [pid: 7788] (Mac OS X 15.6.1 aarch64, Homebrew 17.0.15 x86_64, MSBDiskFPSet, DiskStateQueue).
 @!@!@ENDMSG 2187 @!@!@
 @!@!@STARTMSG 2220:0 @!@!@
 Starting SANY...
 @!@!@ENDMSG 2220 @!@!@
-Parsing file C:\Users\arthp\OneDrive\Documents\GitHub\Autonomous-Railway-Control\verification\tla+\RailwayCrossing.tla (file:/c:/Users/arthp/OneDrive/Documents/GitHub/Autonomous-Railway-Control/verification/tla+/RailwayCrossing.tla)
-Parsing file C:\Users\arthp\AppData\Local\Temp\tlc-7382062958777421377\TLC.tla (jar:file:/C:/Users/arthp/.vscode/extensions/tlaplus.vscode-ide-2025.9.182248/tools/tla2tools.jar!/tla2sany/StandardModules/TLC.tla)
-Parsing file C:\Users\arthp\AppData\Local\Temp\tlc-7382062958777421377\Naturals.tla (jar:file:/C:/Users/arthp/.vscode/extensions/tlaplus.vscode-ide-2025.9.182248/tools/tla2tools.jar!/tla2sany/StandardModules/Naturals.tla)
-Parsing file C:\Users\arthp\AppData\Local\Temp\tlc-7382062958777421377\Sequences.tla (jar:file:/C:/Users/arthp/.vscode/extensions/tlaplus.vscode-ide-2025.9.182248/tools/tla2tools.jar!/tla2sany/StandardModules/Sequences.tla)
-Parsing file C:\Users\arthp\AppData\Local\Temp\tlc-7382062958777421377\FiniteSets.tla (jar:file:/C:/Users/arthp/.vscode/extensions/tlaplus.vscode-ide-2025.9.182248/tools/tla2tools.jar!/tla2sany/StandardModules/FiniteSets.tla)
+Parsing file /Users/neelshah/Documents/GitHub/Autonomous-Railway-Control/verification/tla+/RailwayCrossing.tla
+Parsing file /private/var/folders/wl/ytb29svn04n78rd5ps41pjvr0000gn/T/tlc-9471751197344836379/TLC.tla (jar:file:/Users/neelshah/.vscode/extensions/tlaplus.vscode-ide-2025.4.270431/tools/tla2tools.jar!/tla2sany/StandardModules/TLC.tla)
+Parsing file /private/var/folders/wl/ytb29svn04n78rd5ps41pjvr0000gn/T/tlc-9471751197344836379/Naturals.tla (jar:file:/Users/neelshah/.vscode/extensions/tlaplus.vscode-ide-2025.4.270431/tools/tla2tools.jar!/tla2sany/StandardModules/Naturals.tla)
+Parsing file /private/var/folders/wl/ytb29svn04n78rd5ps41pjvr0000gn/T/tlc-9471751197344836379/Sequences.tla (jar:file:/Users/neelshah/.vscode/extensions/tlaplus.vscode-ide-2025.4.270431/tools/tla2tools.jar!/tla2sany/StandardModules/Sequences.tla)
+Parsing file /private/var/folders/wl/ytb29svn04n78rd5ps41pjvr0000gn/T/tlc-9471751197344836379/FiniteSets.tla (jar:file:/Users/neelshah/.vscode/extensions/tlaplus.vscode-ide-2025.4.270431/tools/tla2tools.jar!/tla2sany/StandardModules/FiniteSets.tla)
 Semantic processing of module Naturals
 Semantic processing of module Sequences
 Semantic processing of module FiniteSets
 Semantic processing of module TLC
 Semantic processing of module RailwayCrossing
-Linting of module RailwayCrossing
 @!@!@STARTMSG 2219:0 @!@!@
 SANY finished.
 @!@!@ENDMSG 2219 @!@!@
 @!@!@STARTMSG 2185:0 @!@!@
-Starting... (2025-09-19 15:53:33)
+Starting... (2025-09-19 15:56:15)
 @!@!@ENDMSG 2185 @!@!@
 @!@!@STARTMSG 2212:0 @!@!@
 Implied-temporal checking--satisfiability problem has 2 branches.
@@ -31,16 +30,16 @@ Implied-temporal checking--satisfiability problem has 2 branches.
 Computing initial states...
 @!@!@ENDMSG 2189 @!@!@
 @!@!@STARTMSG 2190:0 @!@!@
-Finished computing initial states: 1 distinct state generated at 2025-09-19 15:53:33.
+Finished computing initial states: 1 distinct state generated at 2025-09-19 15:56:15.
 @!@!@ENDMSG 2190 @!@!@
 @!@!@STARTMSG 2200:0 @!@!@
-Progress(6) at 2025-09-19 15:53:33: 17 states generated, 10 distinct states found, 0 states left on queue.
+Progress(6) at 2025-09-19 15:56:15: 17 states generated, 10 distinct states found, 0 states left on queue.
 @!@!@ENDMSG 2200 @!@!@
 @!@!@STARTMSG 2192:0 @!@!@
-Checking 2 branches of temporal properties for the complete state space with 20 total distinct states at (2025-09-19 15:53:33)
+Checking 2 branches of temporal properties for the complete state space with 20 total distinct states at (2025-09-19 15:56:15)
 @!@!@ENDMSG 2192 @!@!@
 @!@!@STARTMSG 2267:0 @!@!@
-Finished checking temporal properties in 00s at 2025-09-19 15:53:33
+Finished checking temporal properties in 00s at 2025-09-19 15:56:15
 @!@!@ENDMSG 2267 @!@!@
 @!@!@STARTMSG 2193:0 @!@!@
 Model checking completed. No error has been found.
@@ -49,17 +48,8 @@ Model checking completed. No error has been found.
   calculated (optimistic):  val = 3.8E-18
 @!@!@ENDMSG 2193 @!@!@
 @!@!@STARTMSG 2201:0 @!@!@
-The coverage statistics at 2025-09-19 15:53:33 (see https://explain.tlapl.us/module-coverage-statistics for how to interpret the following statistics).
+The coverage statistics at 2025-09-19 15:56:15
 @!@!@ENDMSG 2201 @!@!@
-@!@!@STARTMSG 2779:0 @!@!@
-<barrier line 7, col 23 to line 7, col 29 of module RailwayCrossing>: 2
-@!@!@ENDMSG 2779 @!@!@
-@!@!@STARTMSG 2779:0 @!@!@
-<car line 7, col 18 to line 7, col 20 of module RailwayCrossing>: 3
-@!@!@ENDMSG 2779 @!@!@
-@!@!@STARTMSG 2779:0 @!@!@
-<train line 7, col 11 to line 7, col 15 of module RailwayCrossing>: 4
-@!@!@ENDMSG 2779 @!@!@
 @!@!@STARTMSG 2773:0 @!@!@
 <Init line 13, col 1 to line 13, col 4 of module RailwayCrossing>: 1:1
 @!@!@ENDMSG 2773 @!@!@
@@ -232,7 +222,7 @@ The coverage statistics at 2025-09-19 15:53:33 (see https://explain.tlapl.us/mod
 End of statistics.
 @!@!@ENDMSG 2202 @!@!@
 @!@!@STARTMSG 2200:0 @!@!@
-Progress(6) at 2025-09-19 15:53:33: 17 states generated (1,097 s/min), 10 distinct states found (645 ds/min), 0 states left on queue.
+Progress(6) at 2025-09-19 15:56:15: 17 states generated (5,483 s/min), 10 distinct states found (3,225 ds/min), 0 states left on queue.
 @!@!@ENDMSG 2200 @!@!@
 @!@!@STARTMSG 2199:0 @!@!@
 17 states generated, 10 distinct states found, 0 states left on queue.
@@ -244,5 +234,5 @@ The depth of the complete state graph search is 6.
 The average outdegree of the complete state graph is 1 (minimum is 0, the maximum 2 and the 95th percentile is 2).
 @!@!@ENDMSG 2268 @!@!@
 @!@!@STARTMSG 2186:0 @!@!@
-Finished in 937ms at (2025-09-19 15:53:33)
+Finished in 215ms at (2025-09-19 15:56:15)
 @!@!@ENDMSG 2186 @!@!@
