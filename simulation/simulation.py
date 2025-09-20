@@ -1,223 +1,227 @@
-# import pygame
-# import sys
-# from simulation.controller import LevelCrossingController, Geometry
 
-# # ---------------- Layout & constants ----------------
-# WIDTH, HEIGHT   = 800, 400
-# TRACK_Y         = 200                   # horizontal tracks center
-# ROAD_X          = 400                   # vertical road x
-# BARRIER_Y       = TRACK_Y + 40          # barrier just before tracks (on road)
-# TRAIN_W, TRAIN_H = 200, 40
-# CAR_W, CAR_H     = 40, 60
-# TRAIN_SPEED      = 5
-# CAR_SPEED        = 2
-
-# geom = Geometry(road_x=ROAD_X, train_w=TRAIN_W, approach_margin=140)
-
-# # ---------------- Pygame setup ----------------------
-# pygame.init()
-# screen = pygame.display.set_mode((WIDTH, HEIGHT))
-# pygame.display.set_caption("Railway Level Crossing Safety System")
-# clock = pygame.time.Clock()
-# font = pygame.font.SysFont(None, 36)
-
-# # Colors
-# WHITE=(255,255,255); BLACK=(0,0,0); RED=(200,0,0); GREEN=(0,200,0)
-# BLUE=(0,0,200); ROAD_GRAY=(210,210,210)
-
-# # ---------------- Simulation state ------------------
-# train_x = -TRAIN_W          # train enters from left
-# car_y   = HEIGHT - 80       # car starts near bottom, moves up
-# ctl     = LevelCrossingController(geom)
-
-# # ---------------- Drawing helpers -------------------
-# def draw_tracks():
-#     pygame.draw.line(screen, BLACK, (0, TRACK_Y-10), (WIDTH, TRACK_Y-10), 5)
-#     pygame.draw.line(screen, BLACK, (0, TRACK_Y+10), (WIDTH, TRACK_Y+10), 5)
-
-# def draw_road():
-#     pygame.draw.rect(screen, ROAD_GRAY, (ROAD_X - 35, 0, 70, HEIGHT))
-#     pygame.draw.line(screen, BLACK, (ROAD_X-35,0), (ROAD_X-35,HEIGHT), 4)
-#     pygame.draw.line(screen, BLACK, (ROAD_X+35,0), (ROAD_X+35,HEIGHT), 4)
-
-# def draw_train(x):
-#     pygame.draw.rect(screen, BLUE, (x, TRACK_Y - TRAIN_H//2, TRAIN_W, TRAIN_H))
-
-# def draw_car(y):
-#     pygame.draw.rect(screen, GREEN, (ROAD_X - CAR_W//2, y, CAR_W, CAR_H))
-
-# def draw_barrier(down: bool):
-#     if down:   # blocking: horizontal arm across road
-#         pygame.draw.rect(screen, RED, (ROAD_X - 40, BARRIER_Y, 80, 10))
-#     else:      # up: vertical post beside road
-#         pygame.draw.rect(screen, RED, (ROAD_X + 45, BARRIER_Y - 40, 10, 80))
-
-# # ---------------- Physics helpers -------------------
-# def car_over_tracks(y):
-#     top, bot = y, y + CAR_H
-#     return not (bot < TRACK_Y - 12 or top > TRACK_Y + 12)
-
-# def car_should_stop(y, barrier_down):
-#     stop_line = BARRIER_Y + 12
-#     near_barrier = (y + CAR_H) >= stop_line and (y < stop_line + 8)
-#     return barrier_down and near_barrier
-
-# def check_collision(train_x, y, barrier_down):
-#     # A collision if (train overlaps road) AND (car overlaps track band) AND barrier is NOT blocking.
-#     train_crossing = ctl.train_in_crossing_zone(train_x)
-#     return (not barrier_down) and train_crossing and car_over_tracks(y)
-
-# # ---------------- Main loop -------------------------
-# def run():
-#     global train_x, car_y
-
-#     while True:
-#         # Events
-#         for event in pygame.event.get():
-#             if event.type == pygame.QUIT:
-#                 pygame.quit(); sys.exit()
-#             if event.type == pygame.KEYDOWN:
-#                 if event.key == pygame.K_h:
-#                     ctl.hazard_mode = not ctl.hazard_mode
-#                 if event.key == pygame.K_f:
-#                     # toggle fail-safe latch (for demo); auto-clears when clear
-#                     ctl.set_fail_safe(not ctl.fail_safe_active)
-
-#         # Background
-#         screen.fill(WHITE)
-#         draw_road()
-#         draw_tracks()
-
-#         # Move train (left -> right; loop)
-#         train_x += TRAIN_SPEED
-#         if train_x > WIDTH:
-#             train_x = -TRAIN_W
-
-#         # Controller update
-#         ctl.update(train_x)
-
-#         # Draw train + barrier
-#         draw_train(train_x)
-#         draw_barrier(ctl.barrier_down)
-
-#         # Move car upward unless blocked at the barrier
-#         if not car_should_stop(car_y, ctl.barrier_down):
-#             car_y -= CAR_SPEED
-#         if car_y + CAR_H < 0:
-#             car_y = HEIGHT - 80  # loop car
-
-#         draw_car(car_y)
-
-#         # Status / safety messages
-#         if check_collision(train_x, car_y, ctl.barrier_down):
-#             msg = font.render("⚠️ COLLISION! Unsafe state!", True, RED)
-#         elif ctl.fail_safe_triggered:
-#             msg = font.render("Fail-safe: Barriers forced down", True, BLACK)
-#             ctl.fail_safe_triggered = False
-#         else:
-#             msg = font.render("System operating safely", True, BLACK)
-
-#         screen.blit(msg, (WIDTH//2 - msg.get_width()//2, 20))
-#         clock.tick(30)
-#         pygame.display.flip()
-
-# if __name__ == "__main__":
-#     run()
 import pygame
 import sys
+from dataclasses import dataclass
+from typing import List
+from math import cos, sin, radians
 from simulation.controller import LevelCrossingController, Geometry
 
-# ---------------- Layout & constants ----------------
-WIDTH, HEIGHT    = 800, 400
-TRACK_Y          = 200                   # horizontal tracks center
-ROAD_X           = 400                   # vertical road x
-BARRIER_Y        = TRACK_Y + 40          # barrier just before tracks (on road)
-TRAIN_W, TRAIN_H = 200, 40
-CAR_W, CAR_H     = 40, 60
+# ===================== Layout & constants =====================
+WIDTH, HEIGHT     = 1000, 560
+TRACK_Y           = 300                    # horizontal tracks center
+ROAD_X            = 520                    # vertical road x (cars move along this)
+BARRIER_Y         = TRACK_Y + 44           # barrier hinge y (on road edge)
 
-# Speeds are in pixels/second (frame-rate independent)
-TRAIN_SPEED_PPS  = 150.0                 # start values; tune live
-CAR_SPEED_PPS    = 90.0
+TRAIN_W, TRAIN_H  = 240, 56
+CAR_W, CAR_H      = 46, 70
 
-# How long before the train reaches the road we want the barrier DOWN
-T_CLOSE_SEC      = 1.2                   # pre-closure time budget
-SAFETY_BUFFER_PX = 20
+# Speeds (pixels/second) — frame-rate independent
+TRAIN_SPEED_PPS   = 170.0
+CAR_SPEED_PPS     = 95.0
 
-# ---------------- Pygame setup ----------------------
+# Barrier timing (pre-close window)
+T_CLOSE_SEC       = 1.2
+SAFETY_BUFFER_PX  = 24
+
+# Car flow
+SPAWN_INTERVAL_SEC = 1.0
+MAX_CARS           = 24
+MIN_HEADWAY_PX     = 20
+
+# Barrier animation (now rotates the correct way)
+BARRIER_LEN        = 110
+BARRIER_DOWN_ANG   = 0        # 0° = horizontal, blocking (extends LEFT across road)
+BARRIER_UP_ANG     = 80       # +80° = raised (swings up)
+BARRIER_SWING_DPS  = 180      # deg/sec
+
+# Flashing lights
+FLASH_HZ           = 1.2
+
+# ===================== Pygame setup ===========================
 pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Railway Level Crossing Safety System")
+pygame.display.set_caption("Railway Level Crossing Safety System — Multi-Car (Polished)")
 clock = pygame.time.Clock()
-font = pygame.font.SysFont(None, 22)
-banner_font = pygame.font.SysFont(None, 36)
+font_small  = pygame.font.SysFont("Arial", 18)
+font_normal = pygame.font.SysFont("Arial", 28, bold=True)
 
-# Colors
-WHITE=(255,255,255); BLACK=(0,0,0); RED=(200,0,0); GREEN=(0,200,0)
-BLUE=(0,0,200); ROAD_GRAY=(210,210,210)
+# Colors (pleasant palette)
+SKY      = (225, 240, 255)
+GROUND   = (210, 225, 210)
+ROAD_ASP = (210, 210, 210)
+RAIL     = (35, 35, 35)
+SLEEPER  = (120, 85, 60)
+WHITE    = (255, 255, 255)
+BLACK    = (0, 0, 0)
+RED      = (205, 40, 40)
+RED_DARK = (160, 20, 20)
+GREEN    = (40, 180, 70)
+GREEN_D  = (35, 140, 55)
+BLUE     = (40, 80, 210)
+YELLOW   = (250, 220, 70)
 
-# ---------------- Simulation state ------------------
-train_x = -TRAIN_W          # train enters from left
-car_y   = HEIGHT - 80       # car starts near bottom, moves up
-
-# geometry; approach_margin will be updated each frame from speed
-geom = Geometry(road_x=ROAD_X, train_w=TRAIN_W, approach_margin=160)
+# ===================== Controller & geometry ==================
+geom = Geometry(road_x=ROAD_X, train_w=TRAIN_W, approach_margin=180)
 ctl  = LevelCrossingController(geom)
 
-# ---------------- Drawing helpers -------------------
-def draw_tracks():
-    pygame.draw.line(screen, BLACK, (0, TRACK_Y-10), (WIDTH, TRACK_Y-10), 5)
-    pygame.draw.line(screen, BLACK, (0, TRACK_Y+10), (WIDTH, TRACK_Y+10), 5)
+# ===================== Simulation state =======================
+train_x = -TRAIN_W
+barrier_angle = BARRIER_UP_ANG      # start raised
+flash_phase = 0.0
 
-def draw_road():
-    pygame.draw.rect(screen, ROAD_GRAY, (ROAD_X - 35, 0, 70, HEIGHT))
-    pygame.draw.line(screen, BLACK, (ROAD_X-35,0), (ROAD_X-35,HEIGHT), 4)
-    pygame.draw.line(screen, BLACK, (ROAD_X+35,0), (ROAD_X+35,HEIGHT), 4)
+@dataclass
+class Car:
+    y: float
+    speed_pps: float = CAR_SPEED_PPS
+
+cars: List[Car] = []
+time_since_spawn = 0.0
+
+# ===================== Drawing helpers ========================
+def draw_round_rect(surf, rect, color, radius=8):
+    pygame.draw.rect(surf, color, rect, border_radius=radius)
+
+def draw_shadow_rect(surf, rect, blur_alpha=40):
+    shadow = pygame.Surface((rect[2], rect[3]), pygame.SRCALPHA)
+    shadow.fill((0, 0, 0, blur_alpha))
+    surf.blit(shadow, (rect[0]+2, rect[1]+2))
+
+def draw_scene_background():
+    # Sky
+    screen.fill(SKY)
+    # Ground
+    pygame.draw.rect(screen, GROUND, (0, TRACK_Y + 80, WIDTH, HEIGHT - (TRACK_Y + 80)))
+    # Road (vertical)
+    pygame.draw.rect(screen, ROAD_ASP, (ROAD_X - 44, 0, 88, HEIGHT))
+    pygame.draw.line(screen, BLACK, (ROAD_X-44, 0), (ROAD_X-44, HEIGHT), 3)
+    pygame.draw.line(screen, BLACK, (ROAD_X+44, 0), (ROAD_X+44, HEIGHT), 3)
+    # Track sleepers (ties)
+    for x in range(-40, WIDTH + 40, 40):
+        pygame.draw.rect(screen, SLEEPER, (x, TRACK_Y - 18, 26, 36))
+    # Rails
+    pygame.draw.line(screen, RAIL, (0, TRACK_Y-14), (WIDTH, TRACK_Y-14), 6)
+    pygame.draw.line(screen, RAIL, (0, TRACK_Y+14), (WIDTH, TRACK_Y+14), 6)
 
 def draw_train(x):
-    pygame.draw.rect(screen, BLUE, (x, TRACK_Y - TRAIN_H//2, TRAIN_W, TRAIN_H))
+    # Body
+    body_rect = pygame.Rect(int(x), TRACK_Y - TRAIN_H//2, TRAIN_W, TRAIN_H)
+    draw_shadow_rect(screen, body_rect)
+    draw_round_rect(screen, body_rect, BLUE, radius=10)
+    # Cab (front)
+    cab_w = 56
+    cab_rect = pygame.Rect(int(x)+TRAIN_W-cab_w, TRACK_Y - TRAIN_H//2-6, cab_w, TRAIN_H+12)
+    draw_round_rect(screen, cab_rect, (25, 60, 180), radius=10)
+    # Windows
+    for i in range(3):
+        wx = int(x) + 20 + i*60
+        wy = TRACK_Y - TRAIN_H//2 + 8
+        draw_round_rect(screen, (wx, wy, 36, 18), (180, 220, 255), radius=4)
+    # Headlight
+    pygame.draw.circle(screen, YELLOW, (int(x)+TRAIN_W-12, TRACK_Y), 6)
 
-def draw_car(y):
-    pygame.draw.rect(screen, GREEN, (ROAD_X - CAR_W//2, y, CAR_W, CAR_H))
+def draw_car(car: Car):
+    x = ROAD_X - CAR_W//2
+    y = int(car.y)
+    # Wheels
+    pygame.draw.circle(screen, BLACK, (ROAD_X - CAR_W//2 + 10, y + CAR_H - 6), 6)
+    pygame.draw.circle(screen, BLACK, (ROAD_X + CAR_W//2 - 10, y + CAR_H - 6), 6)
+    # Body
+    car_rect = pygame.Rect(x, y, CAR_W, CAR_H)
+    draw_shadow_rect(screen, car_rect)
+    draw_round_rect(screen, car_rect, GREEN, radius=8)
+    # Roof & window
+    roof = pygame.Rect(x+6, y+6,     CAR_W-12, 18)
+    win  = pygame.Rect(x+9, y+12,    CAR_W-18, 16)
+    draw_round_rect(screen, roof, GREEN_D, radius=6)
+    draw_round_rect(screen, win,  (190, 230, 255), radius=4)
 
-def draw_barrier(down: bool):
-    if down:   # blocking: horizontal arm across road
-        pygame.draw.rect(screen, RED, (ROAD_X - 40, BARRIER_Y, 80, 10))
-    else:      # up: vertical post beside road
-        pygame.draw.rect(screen, RED, (ROAD_X + 45, BARRIER_Y - 40, 10, 80))
+def draw_barrier(angle_deg: float, lights_on_left: bool, lights_on_right: bool):
+    """
+    Hinge at (ROAD_X+44, BARRIER_Y).
+    Arm extends LEFT across the road when blocking.
+    Angle 0 = horizontal (blocking), +80 = raised.
+    """
+    hinge_x = ROAD_X + 44
+    hinge_y = BARRIER_Y
 
-def hud(train_speed, car_speed):
+    # Post
+    pygame.draw.rect(screen, BLACK,    (hinge_x-10, hinge_y-56, 12, 112))
+    pygame.draw.rect(screen, RED_DARK, (hinge_x-8,  hinge_y-20,  8,  40))
+
+    # Arm polygon (rotated rectangle) — local X points LEFT (negative)
+    arm_len, arm_h = BARRIER_LEN, 10
+    ang = radians(angle_deg)
+    pts_local = [(0, -arm_h/2), (-arm_len, -arm_h/2), (-arm_len, arm_h/2), (0, arm_h/2)]
+    rot = []
+    for px, py in pts_local:
+        rx = hinge_x + px*cos(ang) - py*sin(ang)
+        ry = hinge_y + px*sin(ang) + py*cos(ang)
+        rot.append((rx, ry))
+    pygame.draw.polygon(screen, RED, rot)
+
+    # White stripes along the arm (also leftwards)
+    for i in range(0, arm_len, 20):
+        sx0 = hinge_x + (-(i+4)) * cos(ang);  sy0 = hinge_y + (-(i+4)) * sin(ang)
+        sx1 = hinge_x + (-(i+14)) * cos(ang); sy1 = hinge_y + (-(i+14)) * sin(ang)
+        pygame.draw.line(screen, WHITE, (sx0, sy0), (sx1, sy1), 3)
+
+    # Flashing lights (left & right of road)
+    r = 9
+    left_pos  = (ROAD_X - 58, TRACK_Y - 26)
+    right_pos = (ROAD_X + 58, TRACK_Y - 26)
+    pygame.draw.circle(screen, RED_DARK, left_pos,  r)
+    pygame.draw.circle(screen, RED_DARK, right_pos, r)
+    if lights_on_left:
+        pygame.draw.circle(screen, RED, left_pos,  r)
+    if lights_on_right:
+        pygame.draw.circle(screen, RED, right_pos, r)
+
+def hud_text(train_speed, car_speed, spawn_int, count):
     lines = [
-        f"Train speed: {train_speed:.0f} px/s  (1/2 to - / +)",
-        f"Car speed:   {car_speed:.0f} px/s  (9/0 to - / +)",
-        f"'H' hazard mode (barrier fails)  |  'F' toggle fail-safe latch",
-        f"Approach margin: {ctl.geom.approach_margin}px  (derived from train speed)"
+        f"Train speed: {train_speed:.0f} px/s  (-/+)",
+        f"Car speed:   {car_speed:.0f} px/s  (9/0)",
+        f"Spawn every: {spawn_int:.2f}s  ([ / ])   Cars: {count}/{MAX_CARS}",
+        f"'H' hazard (barrier fails) | 'F' toggle fail-safe | 'C' spawn one car"
     ]
     for i, text in enumerate(lines):
-        s = font.render(text, True, BLACK)
-        screen.blit(s, (8, 8 + i*18))
+        s = font_small.render(text, True, BLACK)
+        screen.blit(s, (10, HEIGHT - 60 + i*18))
 
-# ---------------- Physics helpers -------------------
+# ===================== Physics / logic helpers =================
 def car_over_tracks(y):
     top, bot = y, y + CAR_H
-    return not (bot < TRACK_Y - 12 or top > TRACK_Y + 12)
+    return not (bot < TRACK_Y - 16 or top > TRACK_Y + 16)
 
-def car_should_stop(y, barrier_down):
-    stop_line = BARRIER_Y + 12
-    near_barrier = (y + CAR_H) >= stop_line and (y < stop_line + 8)
+def car_should_stop_at_barrier(y, barrier_down):
+    stop_line = BARRIER_Y + 14
+    near_barrier = (y + CAR_H) >= stop_line and (y < stop_line + 10)
     return barrier_down and near_barrier
 
-def check_collision(train_x, y, barrier_down):
-    train_crossing = ctl.train_in_crossing_zone(train_x)
-    return (not barrier_down) and train_crossing and car_over_tracks(y)
+def check_collision_with_train(train_x_val, car: Car, barrier_down):
+    train_crossing = ctl.train_in_crossing_zone(int(train_x_val))
+    return (not barrier_down) and train_crossing and car_over_tracks(car.y)
 
-# ---------------- Main loop -------------------------
+def maintain_headway(idx: int, new_y: float) -> float:
+    if idx == 0:
+        return new_y
+    ahead = cars[idx - 1]
+    min_allowed_y = ahead.y + CAR_H + MIN_HEADWAY_PX
+    return max(new_y, min_allowed_y)
+
+def spawn_car():
+    if len(cars) >= MAX_CARS: return
+    start_y = HEIGHT - 90 + (len(cars) % 3) * 8
+    cars.append(Car(y=start_y))
+
+# ===================== Main loop ==============================
 def run():
-    global train_x, car_y, TRAIN_SPEED_PPS, CAR_SPEED_PPS
+    global train_x, TRAIN_SPEED_PPS, CAR_SPEED_PPS, SPAWN_INTERVAL_SEC
+    global time_since_spawn, barrier_angle, flash_phase
 
     while True:
-        dt = clock.tick(60) / 1000.0  # seconds since last frame (cap ~60 fps)
+        dt = clock.tick(60) / 1000.0  # seconds/frame
 
-        # Events / controls
+        # Input
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit(); sys.exit()
@@ -225,64 +229,93 @@ def run():
                 if event.key == pygame.K_h:
                     ctl.hazard_mode = not ctl.hazard_mode
                 if event.key == pygame.K_f:
-                    ctl.set_fail_safe(not ctl.fail_safe_active)
-                # Train speed adjust (1/2 decrease, -/+ increase)
-                if event.key in (pygame.K_1, pygame.K_KP1, pygame.K_2, pygame.K_KP2):
-                    TRAIN_SPEED_PPS = max(20.0, TRAIN_SPEED_PPS - 10.0)
+                    # Toggle fail-safe latch (forces barrier down until clear)
+                    ctl.set_fail_safe(not getattr(ctl, "fail_safe_active", False))
                 if event.key in (pygame.K_MINUS, pygame.K_KP_MINUS):
-                    TRAIN_SPEED_PPS = max(20.0, TRAIN_SPEED_PPS - 10.0)
+                    TRAIN_SPEED_PPS = max(30.0, TRAIN_SPEED_PPS - 10.0)
                 if event.key in (pygame.K_EQUALS, pygame.K_PLUS, pygame.K_KP_PLUS):
-                    TRAIN_SPEED_PPS = min(600.0, TRAIN_SPEED_PPS + 10.0)
-                # Car speed adjust (9 decrease, 0 increase)
+                    TRAIN_SPEED_PPS = min(700.0, TRAIN_SPEED_PPS + 10.0)
                 if event.key in (pygame.K_9, pygame.K_KP9):
-                    CAR_SPEED_PPS = max(10.0, CAR_SPEED_PPS - 10.0)
+                    CAR_SPEED_PPS = max(20.0, CAR_SPEED_PPS - 10.0)
                 if event.key in (pygame.K_0, pygame.K_KP0):
-                    CAR_SPEED_PPS = min(400.0, CAR_SPEED_PPS + 10.0)
+                    CAR_SPEED_PPS = min(450.0, CAR_SPEED_PPS + 10.0)
+                if event.key == pygame.K_LEFTBRACKET:
+                    SPAWN_INTERVAL_SEC = max(0.25, SPAWN_INTERVAL_SEC - 0.1)
+                if event.key == pygame.K_RIGHTBRACKET:
+                    SPAWN_INTERVAL_SEC = min(5.0, SPAWN_INTERVAL_SEC + 0.1)
+                if event.key == pygame.K_c:
+                    spawn_car()
 
         # Background
-        screen.fill(WHITE)
-        draw_road()
-        draw_tracks()
+        draw_scene_background()
 
-        # Derive approach margin from current train speed:
-        # we want the barrier down T_CLOSE_SEC before the train reaches the road.
-        # margin = distance train travels in T_CLOSE_SEC + a small buffer.
+        # Pre-close: distance margin from time budget
         ctl.geom.approach_margin = int(TRAIN_SPEED_PPS * T_CLOSE_SEC + SAFETY_BUFFER_PX)
 
-        # Move train (left -> right; loop)
+        # Move train (loop)
         train_x += TRAIN_SPEED_PPS * dt
         if train_x > WIDTH:
             train_x = -TRAIN_W
 
-        # Controller update
-        ctl.update(int(train_x))  # pass int for geometry comparisons
+        # Update controller (barrier command)
+        ctl.update(int(train_x))
 
-        # Draw train + barrier
+        # Smooth barrier animation toward commanded state (unless hazard mode)
+        target_ang = BARRIER_DOWN_ANG if (ctl.barrier_down and not ctl.hazard_mode) else BARRIER_UP_ANG
+        if barrier_angle < target_ang:
+            barrier_angle = min(target_ang, barrier_angle + BARRIER_SWING_DPS * dt)
+        elif barrier_angle > target_ang:
+            barrier_angle = max(target_ang, barrier_angle - BARRIER_SWING_DPS * dt)
+
+        # Flashing lights timing (alternate when down)
+        flash_phase += dt * FLASH_HZ
+        left_on  = int(flash_phase) % 2 == 0 and ctl.barrier_down
+        right_on = int(flash_phase) % 2 == 1 and ctl.barrier_down
+
+        # Draw train + barrier + lights
         draw_train(int(train_x))
-        draw_barrier(ctl.barrier_down)
+        draw_barrier(barrier_angle, left_on, right_on)
 
-        # Move car upward unless blocked at the barrier
-        if not car_should_stop(car_y, ctl.barrier_down):
-            car_y -= CAR_SPEED_PPS * dt
-        if car_y + CAR_H < 0:
-            car_y = HEIGHT - 80  # loop car
+        # Spawn cars over time
+        time_since_spawn += dt
+        if time_since_spawn >= SPAWN_INTERVAL_SEC:
+            time_since_spawn = 0.0
+            spawn_car()
 
-        draw_car(int(car_y))
+        # Update cars (front to back) with headway & barrier stop
+        cars.sort(key=lambda c: c.y)
+        for idx, car in enumerate(cars):
+            desired_y = car.y - car.speed_pps * dt
+            if car_should_stop_at_barrier(desired_y, ctl.barrier_down):
+                desired_y = car.y
+            desired_y = maintain_headway(idx, desired_y)
+            car.y = desired_y
+
+        # Remove cars that exited
+        cars[:] = [c for c in cars if c.y + CAR_H >= -4]
+
+        # Draw cars & check collisions
+        collision = False
+        for car in cars:
+            if check_collision_with_train(train_x, car, ctl.barrier_down):
+                collision = True
+            draw_car(car)
 
         # Status banner
-        if check_collision(int(train_x), int(car_y), ctl.barrier_down):
-            banner = banner_font.render("⚠️ COLLISION! Unsafe state!", True, RED)
-        elif ctl.fail_safe_triggered:
-            banner = banner_font.render("Fail-safe: Barriers forced down", True, BLACK)
+        if collision:
+            banner = font_normal.render("⚠️  COLLISION!  Unsafe state", True, RED)
+        elif getattr(ctl, "fail_safe_triggered", False):
+            banner = font_normal.render("Fail-safe: Barriers forced down", True, BLACK)
             ctl.fail_safe_triggered = False
         else:
-            banner = banner_font.render("System operating safely", True, BLACK)
-        screen.blit(banner, (WIDTH//2 - banner.get_width()//2, 20))
+            banner = font_normal.render("System operating safely", True, BLACK)
+        screen.blit(banner, (WIDTH//2 - banner.get_width()//2, 14))
 
-        # HUD with live values
-        hud(TRAIN_SPEED_PPS, CAR_SPEED_PPS)
+        # HUD
+        hud_text(TRAIN_SPEED_PPS, CAR_SPEED_PPS, SPAWN_INTERVAL_SEC, len(cars))
 
         pygame.display.flip()
 
+# For direct run
 if __name__ == "__main__":
     run()
