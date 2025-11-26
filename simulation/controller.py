@@ -22,10 +22,13 @@ class LevelCrossingController:
         • OPEN  only when TAIL  <= A_k
 
     Barrier command = DOWN if ANY track demands it.
-    Reopen only when ALL tracks are clear (and fail-safe latch not active).
 
-    `hazard_mode` simulates actuator fail-open: command state still changes,
-    but the physical arm in the sim will ignore the down command.
+    Fail-safe:
+      • When fail_safe_active is True, the command is forced DOWN
+        regardless of trains, until the operator toggles it off.
+      • hazard_mode simulates actuator fail-open: the physical arms
+        in the simulation can ignore the down command, but the state
+        still changes.
     """
 
     def __init__(self,
@@ -41,25 +44,37 @@ class LevelCrossingController:
         # Modes / outputs
         self.barrier_down = False
         self.hazard_mode = False
-        self.fail_safe_active = False
-        self.fail_safe_triggered = False
+        self.fail_safe_active = False      # manual latch (F key)
+        self.fail_safe_triggered = False   # one-shot flag for HUD / banner
 
         # Per-track runtime state
         self.tracks_in_section = {0: False, 1: False}
         self.track_demands_down = {0: False, 1: False}
         self.last_nose_x = {0: -10**9, 1: +10**9}  # note: sign helps wrap detection per direction
 
-    # ---- legacy helper used by the sim for collision ----
+    # ---- helper the sim uses for collision ----
     def train_in_crossing_zone(self, nose_x: int) -> bool:
         return nose_x <= self.geom.road_x <= nose_x + self.geom.train_w
 
     # ---- toggles ----
     def set_fail_safe(self, active: bool):
+        """
+        Manual fail-safe latch.
+
+        When active=True:
+          • barrier command will be forced DOWN in finalize_barrier_command()
+          • it stays active until explicitly set to False
+        """
         if active and not self.fail_safe_active:
+            # for one-frame "Fail-safe triggered" banner in the HUD
             self.fail_safe_triggered = True
         self.fail_safe_active = active
 
     def clear_state_for_loop_reset(self, track_id: int):
+        """
+        Reset per-track state when a train wraps off-screen.
+        Fail-safe latch is NOT cleared here (manual only).
+        """
         self.tracks_in_section[track_id] = False
         self.track_demands_down[track_id] = False
         # Reset last nose far away so we won't miss the next approach
@@ -87,21 +102,25 @@ class LevelCrossingController:
 
         # -------- Immediate CLOSE on nose touching the first sensor --------
         if direction == +1:
+            # first sensor is A (left side)
             if nose_x >= a_x:  # nose contact with A
                 self.tracks_in_section[track_id] = True
                 self.track_demands_down[track_id] = True
         else:  # -1
+            # first sensor is B (right side)
             if nose_x <= b_x:  # nose contact with B
                 self.tracks_in_section[track_id] = True
                 self.track_demands_down[track_id] = True
 
         # -------- OPEN only after tail clears the far sensor --------
         if direction == +1:
-            if tail_x >= b_x:  # tail cleared B
+            # tail must clear B
+            if tail_x >= b_x:
                 self.tracks_in_section[track_id] = False
                 self.track_demands_down[track_id] = False
         else:
-            if tail_x <= a_x:  # tail cleared A
+            # tail must clear A
+            if tail_x <= a_x:
                 self.tracks_in_section[track_id] = False
                 self.track_demands_down[track_id] = False
 
@@ -109,17 +128,21 @@ class LevelCrossingController:
 
     # ---- compute the final command once per frame ----
     def finalize_barrier_command(self):
-        # Fail-safe keeps it down until all tracks are clear
-        if self.fail_safe_active and not self.hazard_mode:
-            self.barrier_down = True
-            if not any(self.tracks_in_section.values()):
-                self.fail_safe_active = False
-            return
+        """
+        Decide whether the command to the barrier is DOWN or UP.
 
+        - If fail_safe_active is True (and not in hazard_mode),
+          the command is forced DOWN regardless of trains.
+        - Otherwise, command is DOWN iff any track demands it.
+        """
         demand = any(self.track_demands_down.values())
 
-        # Even if hazard_mode is ON (physical arm won't move), we still update the command state.
-        self.barrier_down = demand
+        if self.fail_safe_active and not self.hazard_mode:
+            # Fail-safe forces the command DOWN, independent of sensors.
+            self.barrier_down = True
+        else:
+            # Normal behavior driven by sensor demands.
+            self.barrier_down = demand
 
     # ---- legacy single-track shim (not used but kept) ----
     def process_train_position(self, nose_x: int):

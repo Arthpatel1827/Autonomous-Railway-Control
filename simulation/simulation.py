@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import List, Optional, Tuple, Dict
 
 from .constants import *
-from . import view  # <<< import the module, not font variables
+from . import view
 from .controller import LevelCrossingController, Geometry
 
 # ===================== Controller & geometry ==================
@@ -90,10 +90,12 @@ def car_should_stop(curr_y: float, next_y: float, direction: int,
       - DOWN cars (dir=+1) stop at NORTH entry (B).
     """
     if direction == -1:  # up → C (south entry)
-        if not entry_down_south: return False
+        if not entry_down_south:
+            return False
         return (curr_y > STOP_LINE_UP + STOP_EPS) and (next_y <= STOP_LINE_UP + STOP_EPS)
     else:                 # down → B (north entry)
-        if not entry_down_north: return False
+        if not entry_down_north:
+            return False
         return (curr_y < STOP_LINE_DOWN - STOP_EPS) and (next_y >= STOP_LINE_DOWN - STOP_EPS)
 
 def spawn_car():
@@ -128,6 +130,41 @@ def maintain_headway_per_lane():
             else:
                 car.y = min(car.y, ahead.y - CAR_H - MIN_HEADWAY_PX)
 
+# ===================== Hazard warning sign ====================
+def draw_hazard_warning(screen: pygame.Surface):
+    """
+    Visual sign so 'drivers' can see hazard mode is active even if gates look up.
+    Shows:
+      - Big red warning panel on the left
+      - Small warning triangle near the road
+    """
+    # Big panel on left side
+    panel_rect = pygame.Rect(20, 80, 360, 110)
+    pygame.draw.rect(screen, (255, 235, 230), panel_rect)        # light background
+    pygame.draw.rect(screen, (200, 40, 40), panel_rect, 4)       # red border
+
+    title = view.font_normal.render("HAZARD MODE ACTIVE", True, (200, 0, 0))
+    line1 = view.font_small.render("Barriers may be faulty.", True, (30, 30, 30))
+    line2 = view.font_small.render("Do NOT enter crossing even if open.", True, (30, 30, 30))
+
+    screen.blit(title, (panel_rect.x + 16, panel_rect.y + 10))
+    screen.blit(line1, (panel_rect.x + 16, panel_rect.y + 50))
+    screen.blit(line2, (panel_rect.x + 16, panel_rect.y + 72))
+
+    # Small triangular road-side warning near the road
+    tri_x = ROAD_X + ROAD_HALF + 80
+    tri_y = (ZONE_TOP + ZONE_BOT) // 2
+    tri_points = [
+        (tri_x, tri_y - 40),
+        (tri_x - 36, tri_y + 32),
+        (tri_x + 36, tri_y + 32),
+    ]
+    pygame.draw.polygon(screen, (230, 220, 210), tri_points)
+    pygame.draw.polygon(screen, (200, 40, 40), tri_points, 3)
+
+    ex_mark = view.font_small.render("!", True, (200, 40, 40))
+    screen.blit(ex_mark, (tri_x - ex_mark.get_width()//2, tri_y - ex_mark.get_height()//2))
+
 # ===================== Main loop ==============================
 def run():
     global train, time_to_next_train, time_to_next_car, flash_phase, bar_ang
@@ -136,7 +173,7 @@ def run():
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Level Crossing — Barriers A/B/C/D")
     clock = pygame.time.Clock()
-    view.init_fonts()   # <<< initialize fonts inside the module
+    view.init_fonts()
 
     while True:
         dt = clock.tick(60) / 1000.0
@@ -146,12 +183,16 @@ def run():
             if event.type == pygame.QUIT:
                 pygame.quit(); sys.exit()
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_h: ctl.hazard_mode = not ctl.hazard_mode
-                if event.key == pygame.K_f: ctl.set_fail_safe(not ctl.fail_safe_active)
+                if event.key == pygame.K_h:
+                    ctl.hazard_mode = not ctl.hazard_mode
+                if event.key == pygame.K_f:
+                    ctl.set_fail_safe(not ctl.fail_safe_active)
                 if event.key == pygame.K_9:
-                    for c in cars: c.speed_pps = max(15.0, c.speed_pps - 5.0)
+                    for c in cars:
+                        c.speed_pps = max(15.0, c.speed_pps - 5.0)
                 if event.key == pygame.K_0:
-                    for c in cars: c.speed_pps = min(300.0, c.speed_pps + 5.0)
+                    for c in cars:
+                        c.speed_pps = min(300.0, c.speed_pps + 5.0)
 
         # Background & sensors
         view.draw_scene_background(screen)
@@ -179,7 +220,7 @@ def run():
 
         # Controller barrier command due to train sensors
         ctl.finalize_barrier_command()
-        want_down = ctl.barrier_down and not ctl.hazard_mode   # ONLY trains trigger closure
+        want_down = ctl.barrier_down and not ctl.hazard_mode   # ONLY trains trigger closure for the mechanism
 
         # -------- Barrier targets (A/B/C/D) ----------
         nb_in = northbound_in_zone()
@@ -195,7 +236,13 @@ def run():
                 "D": not sb_in,   # D down unless southbound cars are inside
             }
 
-        # ---- Animate each named barrier toward its target ----
+        # ---- Hazard override for DRIVERS (warning logic) ----
+        # Even if the physical barriers (A–D) are visually up in hazard_mode,
+        # drivers must treat BOTH entries as CLOSED and not enter.
+        entry_down_north_cars = target_down["B"] or ctl.hazard_mode  # B = north entry
+        entry_down_south_cars = target_down["C"] or ctl.hazard_mode  # C = south entry
+
+        # ---- Animate each named barrier toward its target (visual only) ----
         for key in ("A", "B", "C", "D"):
             targ_ang = BARRIER_DOWN_ANG if target_down[key] else BARRIER_UP_ANG
             if bar_ang[key] < targ_ang:
@@ -226,6 +273,10 @@ def run():
                                "C", bar_ang["C"], south_light_left,
                                "D", bar_ang["D"], south_light_right)
 
+        # --- HAZARD VISUAL SIGN ---
+        if ctl.hazard_mode:
+            draw_hazard_warning(screen)
+
         # --- Cars: spawn & move ---
         time_to_next_car -= dt
         if time_to_next_car <= 0.0:
@@ -234,9 +285,11 @@ def run():
         for car in cars:
             curr_y = car.y
             next_y = car.y + car.direction * car.speed_pps * dt
-            stop = car_should_stop(curr_y, next_y, car.direction,
-                                   entry_down_north=target_down["B"],  # B = north entry
-                                   entry_down_south=target_down["C"])  # C = south entry
+            stop = car_should_stop(
+                curr_y, next_y, car.direction,
+                entry_down_north=entry_down_north_cars,  # includes hazard
+                entry_down_south=entry_down_south_cars   # includes hazard
+            )
             if stop:
                 next_y = curr_y
             car.y = next_y
@@ -252,17 +305,19 @@ def run():
 
         if collision:
             banner = view.banner_surface(RED, "⚠️  COLLISION!  Unsafe state", view.font_normal)
-        elif getattr(ctl, "fail_safe_triggered", False):
+        elif ctl.fail_safe_triggered:
             banner = view.banner_surface(BLACK, "Fail-safe: Barriers forced down", view.font_normal)
             ctl.fail_safe_triggered = False
         else:
             banner = view.banner_surface(BLACK, "System operating safely", view.font_normal)
         screen.blit(banner, (WIDTH//2 - banner.get_width()//2, 14))
 
-        view.hud_text(screen, view.font_small, active_info, target_down,
-                      time_to_next_train, time_to_next_car,
-                      len(cars), MIN_HEADWAY_PX, CAR_SPEED_PPS,
-                      ctl.hazard_mode, ctl.fail_safe_active)
+        view.hud_text(
+            screen, view.font_small, active_info, target_down,
+            time_to_next_train, time_to_next_car,
+            len(cars), MIN_HEADWAY_PX, CAR_SPEED_PPS,
+            ctl.hazard_mode, ctl.fail_safe_active
+        )
         pygame.display.flip()
 
 # For direct run
